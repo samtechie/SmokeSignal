@@ -19,6 +19,7 @@ import UserNotice as UN exposing (UserNotice)
 import View.About
 import View.Attrs exposing (cappedWidth, hover, whiteGlowAttribute, whiteGlowAttributeSmall)
 import View.Common exposing (whenAttr)
+import View.Compose
 import View.Home
 import View.Img
 import View.Mobile
@@ -192,6 +193,10 @@ viewBody model =
     case model.view of
         ViewHome ->
             View.Home.view model
+                |> viewFrame model
+
+        ViewCompose ->
+            View.Compose.view model
                 |> viewFrame model
 
         ViewTopics ->

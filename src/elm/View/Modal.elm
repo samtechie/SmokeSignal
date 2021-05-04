@@ -10,7 +10,6 @@ import Theme exposing (black, blue, white)
 import Types exposing (..)
 import View.Attrs exposing (cappedWidth, hover, roundBorder, sansSerifFont, whiteGlowAttribute, whiteGlowAttributeSmall)
 import View.Common
-import View.Compose
 import View.Img
 import View.Wallet
 import Wallet
@@ -95,7 +94,8 @@ view model =
                         ]
                     |> View.Common.wrapModal ComposeClose
                 )
-                (View.Compose.view model
+                --(View.Compose.view model
+                (always Element.none
                     >> (if isMobile then
                             identity
 

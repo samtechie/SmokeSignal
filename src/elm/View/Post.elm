@@ -1,20 +1,22 @@
-module View.Post exposing (view, viewBurnOrTip, viewChainCard)
+module View.Post exposing (view, viewBurnOrTip, viewChainCard, viewComposeInput, viewReplyInput)
 
 import Chain
 import Element exposing (Color, Element, alignBottom, centerX, centerY, column, el, fill, height, padding, paragraph, px, row, spaceEvenly, spacing, text, width)
 import Element.Background as Background
 import Element.Border as Border
+import Element.Events
 import Element.Font as Font
 import Element.Input as Input
+import Html.Attributes
 import Maybe.Extra exposing (unwrap)
 import Misc
 import Set
-import Theme exposing (almostWhite, black, white)
+import Theme exposing (almostWhite, black, orange, white)
 import Time exposing (Posix)
 import TokenValue exposing (TokenValue)
 import Types exposing (..)
-import View.Attrs exposing (hover, roundBorder, slightRound, typeFont, whiteGlowAttributeSmall)
-import View.Common exposing (chain, phaceElement, when, whenJust)
+import View.Attrs exposing (hover, roundBorder, sansSerifFont, slightRound, typeFont, whiteGlowAttributeSmall)
+import View.Common exposing (chain, phaceElement, when, whenAttr, whenJust)
 import View.Img
 import View.Markdown
 
@@ -445,3 +447,315 @@ supportBurnButton postId =
             View.Img.dollar 30 white
                 |> el [ centerX, centerY ]
         }
+
+
+viewComposeInput : String -> Bool -> DisplayProfile -> ComposeModel -> UserInfo -> Element Msg
+viewComposeInput topicInput =
+    viewComposePanel True
+        ([ "Topic"
+            |> text
+            |> el [ centerY ]
+            |> el
+                [ Background.color orange
+                , Border.roundEach
+                    { bottomLeft = 5
+                    , topLeft = 5
+                    , bottomRight = 0
+                    , topRight = 0
+                    }
+                , height fill
+                , Element.paddingXY 10 0
+                , sansSerifFont
+                ]
+         , Input.text
+            [ Background.color white
+            , width <| px 250
+            , Border.roundEach
+                { bottomLeft = 0
+                , topLeft = 0
+                , bottomRight = 5
+                , topRight = 5
+                }
+            , padding 5
+            , height <| px 35
+            , Element.Events.onLoseFocus SanitizeTopic
+            ]
+            { onChange = TopicInputChange
+            , label = Input.labelHidden ""
+            , placeholder =
+                text "Choose topic"
+                    |> Input.placeholder []
+                    |> Just
+            , text = topicInput
+            }
+         ]
+            |> row [ Element.paddingXY 0 3 ]
+        )
+
+
+viewReplyInput : Bool -> DisplayProfile -> ComposeModel -> UserInfo -> Element Msg
+viewReplyInput a b c userInfo =
+    viewComposePanel False (viewReplyLabel userInfo.chain) a b c userInfo
+
+
+viewComposePanel : Bool -> Element Msg -> Bool -> DisplayProfile -> ComposeModel -> UserInfo -> Element Msg
+viewComposePanel isCompose elem chainSwitchInProgress dProfile compose userInfo =
+    let
+        isMobile =
+            dProfile == Mobile
+
+        submitEnabled =
+            not (String.isEmpty compose.body)
+                && validTopic
+                && not compose.inProgress
+
+        validTopic =
+            True
+
+        topButton txt val =
+            let
+                active =
+                    val == compose.preview
+            in
+            Input.button
+                [ padding 10
+                , Background.color orange
+                    |> whenAttr active
+                , Element.alignRight
+                , Border.roundEach
+                    { bottomLeft = 0
+                    , topLeft = 5
+                    , bottomRight = 0
+                    , topRight = 5
+                    }
+                , hover
+                    |> whenAttr (not active)
+                , sansSerifFont
+                , if active then
+                    Font.color black
+
+                  else
+                    Font.color white
+                , Font.bold
+                ]
+                { onPress = Just <| PreviewSet val
+                , label = text txt
+                }
+    in
+    [ [ [ topButton "Write" False
+        , topButton "Preview" True
+        ]
+            |> row [ spacing 10, Element.paddingXY 10 0 ]
+      , elem
+            |> when (not isMobile)
+      ]
+        |> row [ width fill, spaceEvenly ]
+    , [ View.Common.viewInstructions chainSwitchInProgress dProfile userInfo
+      , Input.text
+            [ width fill
+            , View.Attrs.whiteGlowAttributeSmall
+            ]
+            { onChange = ComposeTitleChange
+            , label = Input.labelHidden ""
+            , placeholder =
+                "Title (Optional)"
+                    |> text
+                    |> Input.placeholder []
+                    |> Just
+            , text = compose.title
+            }
+            |> when isCompose
+      , viewMarkdown dProfile
+            compose
+            (if isCompose then
+                px 450
+
+             else
+                px 200
+            )
+            |> el
+                [ width fill
+                , compose.error
+                    |> whenJust
+                        ((\txt ->
+                            [ text txt
+                            , Input.button [ hover ]
+                                { onPress = Just CloseComposeError
+                                , label = View.Img.close 25 black
+                                }
+                            ]
+                         )
+                            >> row
+                                [ Background.color white
+                                , slightRound
+                                , padding 10
+                                , spacing 10
+                                , Font.color black
+                                ]
+                            >> el
+                                [ padding 10
+                                , Element.alignBottom
+                                , Element.alignRight
+                                ]
+                        )
+                    |> Element.inFront
+                ]
+      , [ viewBurnAmountUX compose.dollar
+        , [ View.Common.cancel ComposeClose
+                |> el [ Font.color black ]
+                |> when (not isCompose)
+          , Input.button
+                [ Background.color Theme.darkGreen
+                , Font.bold
+                , Font.size 25
+                , Element.alignRight
+                , View.Attrs.roundBorder
+                , if submitEnabled then
+                    hover
+
+                  else
+                    View.Attrs.notAllowed
+                , sansSerifFont
+                , width <| px 100
+                , height <| px 50
+                ]
+                { onPress =
+                    if submitEnabled then
+                        Just SubmitDraft
+
+                    else
+                        Nothing
+                , label =
+                    if compose.inProgress then
+                        View.Common.spinner 20 white
+                            |> el [ centerX, centerY ]
+
+                    else
+                        text "Submit"
+                            |> el [ centerX, centerY ]
+                }
+          ]
+            |> row [ Element.alignRight, spacing 20 ]
+        ]
+            |> row [ width fill ]
+      ]
+        |> column
+            [ width fill
+            , spacing 10
+            , padding 10
+            , roundBorder
+            , Background.color orange
+            ]
+    ]
+        |> column
+            [ height fill
+            , width fill
+            ]
+
+
+viewReplyLabel : Chain -> Element msg
+viewReplyLabel chain =
+    [ [ View.Img.replyArrow 25 orange
+      , "Reply with"
+            |> text
+            |> el [ Font.color orange ]
+      ]
+        |> row [ spacing 10 ]
+    , View.Common.chain chain
+        |> el
+            [ Background.color white
+            , View.Attrs.roundBorder
+            , padding 5
+            , Font.color black
+            ]
+    ]
+        |> row [ spacing 10, Element.moveUp 5 ]
+
+
+viewBurnAmountUX : String -> Element Msg
+viewBurnAmountUX amountInput =
+    [ [ text "A higher burn means more visibility!" ]
+        |> paragraph
+            [ Font.size 14
+            , spacing 3
+            , Font.color white
+            , Font.italic
+            , Font.center
+            , width fill
+            ]
+    , [ View.Img.dollar 26 white
+      , Input.text
+            [ View.Attrs.whiteGlowAttributeSmall
+            , Background.color <| Element.rgb 0 0 0
+            , Font.color white
+            , width <| px 60
+            , height <| px 34
+            , padding 3
+            , Font.size 26
+            ]
+            { onChange = ComposeDollarChange
+            , label = Input.labelHidden ""
+            , placeholder = Just <| Input.placeholder [] <| text "0.00"
+            , text = amountInput
+            }
+      ]
+        |> row [ spacing 5 ]
+    ]
+        |> row
+            [ spacing 5
+            , padding 5
+            , Background.color <| Element.rgb 0.4 0.2 0.2
+            , roundBorder
+            , View.Attrs.cappedWidth 300
+            ]
+
+
+viewMarkdown : DisplayProfile -> ComposeModel -> Element.Length -> Element Msg
+viewMarkdown dProfile compose heightLen =
+    if compose.preview then
+        (if String.isEmpty compose.body then
+            text "Nothing to preview"
+
+         else
+            compose.body
+                |> View.Markdown.renderString dProfile
+        )
+            |> el
+                [ width fill
+                , height heightLen
+                , Element.scrollbarY
+                , Font.color white
+                , padding 10
+                , Background.color black
+                ]
+            |> List.singleton
+            |> column [ width fill, height fill ]
+
+    else
+        Input.multiline
+            [ width fill
+            , height heightLen
+            , Element.scrollbarY
+            , Font.color white
+            , Border.width 0
+            , Border.rounded 0
+            , Background.color black
+            ]
+            { onChange = Types.ComposeBodyChange
+            , label = Input.labelHidden ""
+            , placeholder =
+                "What do you want to say?"
+                    |> text
+                    |> Input.placeholder []
+                    |> Just
+            , text = compose.body
+            , spellcheck = True
+            }
+            |> el
+                [ Html.Attributes.class "multiline"
+                    |> Element.htmlAttribute
+
+                --, Element.scrollbarY
+                , height fill
+                , width fill
+                ]

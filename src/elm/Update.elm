@@ -1606,6 +1606,68 @@ handleRoute model route =
             , [ defaultTitle ]
             )
 
+        RouteCompose ->
+            if model.wallet == NoneDetected then
+                ( { model
+                    | compose =
+                        if Wallet.isActive model.wallet then
+                            { emptyComposeModel | reply = True }
+
+                        else
+                            { emptyComposeModel | modal = True }
+                    , view = ViewCompose
+                  }
+                , [ GTagData
+                        "onboarding initiated"
+                        Nothing
+                        Nothing
+                        Nothing
+                        |> gTagOut
+                  , defaultTitle
+                  ]
+                )
+
+            else
+                let
+                    topic =
+                        case model.view of
+                            ViewTopic t ->
+                                t
+
+                            _ ->
+                                model.topicInput
+                                    |> Misc.validateTopic
+                                    |> Maybe.withDefault Misc.defaultTopic
+
+                    trackingCmd =
+                        if Wallet.isActive model.wallet then
+                            Tracking.composePostOpened
+
+                        else
+                            Cmd.none
+                in
+                ( { model
+                    | compose =
+                        { emptyComposeModel
+                            | context = Types.TopLevel topic
+                            , title = model.compose.title
+                            , body = model.compose.body
+                        }
+                    , topicInput = topic
+                    , view = ViewCompose
+                  }
+                , [ trackingCmd
+                  , model.wallet
+                        |> Wallet.userInfo
+                        |> unwrap Cmd.none
+                            (.address
+                                >> Eth.Utils.addressToString
+                                >> Ports.refreshWallet
+                            )
+                  , defaultTitle
+                  ]
+                )
+
         RouteHome ->
             ( { model
                 | view = ViewHome

@@ -236,6 +236,7 @@ type View
     | ViewTxns
     | ViewAbout
     | ViewUser Address
+    | ViewCompose
 
 
 type alias UserInfo =
@@ -361,6 +362,7 @@ type Route
     | RouteTxns
     | RouteWallet
     | RouteAbout
+    | RouteCompose
     | RouteUser Address
 
 
